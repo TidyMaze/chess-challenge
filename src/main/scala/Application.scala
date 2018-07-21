@@ -40,11 +40,12 @@ object Application extends App {
       case (value, times) => Seq.fill[A](times)(value)
     }.toSeq
 
-  def solve(problemInput: ProblemInput): Seq[Board] = backtrack(
-    mkBoard(problemInput.width, problemInput.height),
-    Coord(0, 0),
-    mapToRepeatSeq(problemInput.pieces)
-  )
+  def solve(problemInput: ProblemInput): Set[Board] =
+    backtrack(
+      mkBoard(problemInput.width, problemInput.height),
+      Some(Coord(0, 0)),
+      mapToRepeatSeq(problemInput.pieces)
+    ).toSet
 
   def mkBoard(width: Int, height: Int): Board =
     Array
@@ -59,26 +60,37 @@ object Application extends App {
     Some(coordCandidate).filter(validCoord(board, _))
   }
 
-  def backtrack(board: Board, coord: Coord, remainingPieces: Seq[PieceType]): Seq[Board] = {
-    println(s"backtracking at $coord with pieces $remainingPieces board:\n" + boardAsString(board))
+  def backtrack(board: Board,
+                maybeCoord: Option[Coord],
+                remainingPieces: Seq[PieceType]): Seq[Board] = {
+
+    val depth: String = maybeCoord.map(c => "" + c.y * board.head.size + c.x).getOrElse("None")
+
+    println(
+      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
+        board))
     val validBoard     = valid(board)
-    val maybeNextCoord = nextCoord(board, coord)
-    (validBoard, remainingPieces, maybeNextCoord) match {
+    val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
+
+    if (!validBoard) println("Invalid board")
+
+    (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
       case (false, _, _) => Nil
-      // still pieces to put but at end of board : stop here
-      case (true, remaining, None) if remaining.nonEmpty => Nil
       // valid board and no more pieces to put : found one solution
       case (true, Nil, _) => Seq(board)
+      // still pieces to put but at end of board : stop here
+      case (true, remaining, None) if remaining.nonEmpty => Nil
       // not finished yet. Keep searching deeper
-      case (true, _ :: _, Some(nextCoord)) =>
+      case (true, _ :: _, Some(coord)) =>
         remainingPieces.indices.flatMap(
           pieceIndex =>
             backtrack(
               put(board, coord, remainingPieces(pieceIndex)),
-              coord = nextCoord,
+              maybeCoord = maybeNextCoord,
               remainingPieces.patch(pieceIndex, Nil, 1)
-          ))
+          )) ++ backtrack(board, maybeNextCoord, remainingPieces)
+
     }
   }
 
@@ -155,5 +167,5 @@ object Application extends App {
 
   val solutions = solve(exampleProblem)
   println("Solutions:")
-  println(solutions map boardAsString)
+  println(solutions map ("\n" + boardAsString(_)))
 }
