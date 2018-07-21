@@ -66,13 +66,13 @@ object Application extends App {
 
     val depth: String = maybeCoord.map(c => "" + c.y * board.head.size + c.x).getOrElse("None")
 
-    println(
-      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
-        board))
+//    println(
+//      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
+//        board))
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
 
-    if (!validBoard) println("Invalid board")
+//    if (!validBoard) println("Invalid board")
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
@@ -165,7 +165,12 @@ object Application extends App {
   val exampleProblem2 = ProblemInput(4, 4, Map(Rook -> 2, Knight -> 4))
   val evalProblem     = ProblemInput(7, 7, Map(King -> 2, Queen  -> 2, Bishop -> 2, Knight -> 1))
 
-  val solutions = solve(exampleProblem)
-  println("Solutions:")
-  println(solutions map ("\n" + boardAsString(_)))
+  val problems = Seq(exampleProblem, exampleProblem2, evalProblem)
+
+  problems.foreach(problem => {
+    val solutions = solve(problem)
+    println("Solutions:")
+    println(solutions map ("\n" + boardAsString(_)))
+  })
+
 }
