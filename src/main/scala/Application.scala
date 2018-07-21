@@ -64,15 +64,14 @@ object Application extends App {
                 maybeCoord: Option[Coord],
                 remainingPieces: Seq[PieceType]): Seq[Board] = {
 
-    val depth: String = maybeCoord.map(c => "" + c.y * board.head.size + c.x).getOrElse("None")
-
-//    println(
-//      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
-//        board))
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
 
-//    if (!validBoard) println("Invalid board")
+    //    val depth: String = maybeCoord.map(c => "" + c.y * board.head.size + c.x).getOrElse("None")
+    //    println(
+    //      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
+    //        board))
+    //    if (!validBoard) println("Invalid board")
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
@@ -169,8 +168,10 @@ object Application extends App {
 
   problems.foreach(problem => {
     val solutions = solve(problem)
-    println("Solutions:")
-    println(solutions map ("\n" + boardAsString(_)))
+    println(s"Problem $problem")
+    println(s"Solutions (${solutions.size}):")
+    println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
+    println()
   })
 
 }
