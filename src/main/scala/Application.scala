@@ -97,14 +97,19 @@ object Application extends App {
   /*
   Valid if no piece range intersect another piece
    */
-  def valid(board: Board): Boolean =
-    (for {
-      y <- board.indices
-      x <- board.head.indices
-      if board(y)(x).isDefined
-    } yield Coord(x, y)).forall(pieceCoord =>
-      listCoordsInRange(board, board(pieceCoord.y)(pieceCoord.x).get, pieceCoord)
-        .forall(coordInRange => board(coordInRange.y)(coordInRange.x).isEmpty))
+  def valid(board: Board): Boolean = {
+    for (y <- board.indices) {
+      for (x <- board.head.indices) {
+        val currentCell = board(y)(x)
+        if (currentCell.isDefined) {
+          for (coordInRange <- listCoordsInRange(board, currentCell.get, Coord(x, y))) {
+            if (board(coordInRange.y)(coordInRange.x).isDefined) return false
+          }
+        }
+      }
+    }
+    true
+  }
 
   def validCoord(board: Board, coord: Coord) =
     coord.x >= 0 && coord.x < board.head.size && coord.y >= 0 && coord.y < board.size
