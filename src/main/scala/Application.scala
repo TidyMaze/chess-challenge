@@ -183,19 +183,32 @@ object Application extends App {
       case Knight => getKnightCoordsInRange _
     })(board, coord)
 
+  def timeMs[R](block: => R): (R, Float) = {
+    val t0     = System.nanoTime()
+    val result = block // call-by-name
+    val t1     = System.nanoTime()
+    val delta  = (t1 - t0).toFloat / 1000000.toFloat
+    (result, delta)
+  }
+
   val exampleProblem  = ProblemInput(3, 3, Map(King -> 2, Rook   -> 1))
   val exampleProblem2 = ProblemInput(4, 4, Map(Rook -> 2, Knight -> 4))
   val evalProblem     = ProblemInput(7, 7, Map(King -> 2, Queen  -> 2, Bishop -> 2, Knight -> 1))
 
-  val problems = Seq(exampleProblem, exampleProblem2, evalProblem)
+  val problems = Seq(exampleProblem2)
+
+  var totTime     = 0.0f
+  var samplesSize = 0
 
   while (true) {
     problems.foreach(problem => {
-      val solutions = solve(problem)
-      println(s"Problem $problem")
-      println(s"Solutions (${solutions.size}):")
-      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
-      println()
+      val (solutions, timeSpent: Float) = timeMs(solve(problem))
+      totTime += timeSpent
+      samplesSize += 1
+      println(
+        s"Problem $problem : Solutions (${solutions.size}) in $timeSpent ns (avg ${totTime / samplesSize}):")
+//      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
+//      println()
     })
   }
 }
