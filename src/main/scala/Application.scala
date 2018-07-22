@@ -1,4 +1,9 @@
+import Application.Board
+
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 sealed trait PieceType
 
@@ -13,6 +18,8 @@ case object Rook extends PieceType
 case object Knight extends PieceType
 
 object Application extends App {
+
+  implicit val ec = ExecutionContext.global
 
   type Board = IndexedSeq[IndexedSeq[Option[PieceType]]]
 
@@ -41,12 +48,13 @@ object Application extends App {
       case (value, times) => Seq.fill[A](times)(value)
     }.toSeq
 
-  def solve(problemInput: ProblemInput): Set[Board] =
+  def solve(problemInput: ProblemInput)(implicit ec: ExecutionContext): Future[Set[Board]] = {
     backtrack(
       mkBoard(problemInput.width, problemInput.height),
       Some(Coord(0, 0)),
       mapToRepeatSeq(problemInput.pieces)
-    ).toSet
+    ).map(_.toSet)
+  }
 
   def mkBoard(width: Int, height: Int): Board =
     Array
@@ -61,9 +69,8 @@ object Application extends App {
     Some(coordCandidate).filter(validCoord(board, _))
   }
 
-  def backtrack(board: Board,
-                maybeCoord: Option[Coord],
-                remainingPieces: Seq[PieceType]): Seq[Board] = {
+  def backtrack(board: Board, maybeCoord: Option[Coord], remainingPieces: Seq[PieceType])(
+      implicit ec: ExecutionContext): Future[Seq[Board]] = {
 
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
@@ -76,21 +83,26 @@ object Application extends App {
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
-      case (false, _, _) => Nil
+      case (false, _, _) => Future.successful(Nil)
       // valid board and no more pieces to put : found one solution
-      case (true, Nil, _) => Seq(board)
+      case (true, Nil, _) => Future.successful(Seq(board))
       // still pieces to put but at end of board : stop here
-      case (true, remaining, None) if remaining.nonEmpty => Nil
+      case (true, remaining, None) if remaining.nonEmpty => Future.successful(Nil)
       // not finished yet. Keep searching deeper
       case (true, _ :: _, Some(coord)) =>
-        remainingPieces.indices.flatMap(
-          pieceIndex =>
-            backtrack(
-              put(board, coord, remainingPieces(pieceIndex)),
-              maybeCoord = maybeNextCoord,
-              remainingPieces.patch(pieceIndex, Nil, 1)
-          )) ++ backtrack(board, maybeNextCoord, remainingPieces)
-
+        Future
+          .sequence(
+            backtrack(board, maybeNextCoord, remainingPieces) +:
+              remainingPieces.indices
+              .map(pieceIndex =>
+                Future {
+                  backtrack(
+                    put(board, coord, remainingPieces(pieceIndex)),
+                    maybeCoord = maybeNextCoord,
+                    remainingPieces.patch(pieceIndex, Nil, 1)
+                  )
+                }.flatten))
+          .map(_.flatten)
     }
   }
 
@@ -189,13 +201,14 @@ object Application extends App {
 
   val problems = Seq(exampleProblem, exampleProblem2, evalProblem)
 
-  while (true) {
-    problems.foreach(problem => {
-      val solutions = solve(problem)
+  problems.foreach(problem => {
+    val f = solve(problem).map(solutions => {
       println(s"Problem $problem")
       println(s"Solutions (${solutions.size}):")
       println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
       println()
     })
-  }
+
+    Await.result(f, 5 minutes)
+  })
 }
