@@ -75,11 +75,14 @@ object Application extends App {
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
 
-    //    val depth: String = maybeCoord.map(c => "" + c.y * board.head.size + c.x).getOrElse("None")
-    //    println(
-    //      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
-    //        board))
-    //    if (!validBoard) println("Invalid board")
+    if (validBoard) {
+//      val depth: String = maybeCoord.map(c => "" + (c.y * board.head.size + c.x)).getOrElse("None")
+//      println(
+//        s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
+//          board))
+    } else {
+//      println("Invalid board")
+    }
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
@@ -92,8 +95,7 @@ object Application extends App {
       case (true, _ :: _, Some(coord)) =>
         Future
           .sequence(
-            backtrack(board, maybeNextCoord, remainingPieces) +:
-              remainingPieces.indices
+            remainingPieces.indices
               .map(pieceIndex =>
                 Future {
                   backtrack(
@@ -101,7 +103,7 @@ object Application extends App {
                     maybeCoord = maybeNextCoord,
                     remainingPieces.patch(pieceIndex, Nil, 1)
                   )
-                }.flatten))
+                }.flatten) :+ backtrack(board, maybeNextCoord, remainingPieces))
           .map(_.flatten)
     }
   }
@@ -201,14 +203,16 @@ object Application extends App {
 
   val problems = Seq(exampleProblem, exampleProblem2, evalProblem)
 
-  problems.foreach(problem => {
-    val f = solve(problem).map(solutions => {
-      println(s"Problem $problem")
-      println(s"Solutions (${solutions.size}):")
-      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
-      println()
-    })
+  while (true) {
+    problems.foreach(problem => {
+      val f = solve(problem).map(solutions => {
+        println(s"Problem $problem")
+        println(s"Solutions (${solutions.size}):")
+        println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
+        println()
+      })
 
-    Await.result(f, 5 minutes)
-  })
+      Await.result(f, 5 minutes)
+    })
+  }
 }
