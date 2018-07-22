@@ -1,4 +1,5 @@
 import scala.collection.mutable.ListBuffer
+import scala.collection.immutable.{Seq, IndexedSeq}
 import scala.collection.parallel.immutable.{ParSeq, ParSet}
 
 sealed trait PieceType
@@ -38,9 +39,11 @@ object Application extends App {
   }
 
   def mapToRepeatSeq[A](data: Map[A, Int]): Seq[A] =
-    data.flatMap {
-      case (value, times) => Seq.fill[A](times)(value)
-    }.toSeq
+    data
+      .flatMap {
+        case (value, times) => Seq.fill[A](times)(value)
+      }
+      .to[Seq]
 
   def solve(problemInput: ProblemInput): ParSet[Board] =
     backtrack(
@@ -52,8 +55,8 @@ object Application extends App {
   def mkBoard(width: Int, height: Int): Board =
     Array
       .tabulate[Option[PieceType]](width, height)((_, _) => Option.empty[PieceType])
-      .map(_.toIndexedSeq)
-      .toIndexedSeq
+      .map(_.to[IndexedSeq])
+      .to[IndexedSeq]
 
   def nextCoord(board: Board, currentCoord: Coord): Option[Coord] = {
     val inlineCoord    = currentCoord.y * board.head.size + currentCoord.x
@@ -125,17 +128,10 @@ object Application extends App {
   def validCoordCurried(board: Board) = (validCoord _).curried(board)
 
   def getKingCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq(Coord(-1, -1),
-        Coord(0, -1),
-        Coord(1, -1),
-        Coord(-1, 0),
-        Coord(1, 0),
-        Coord(-1, 1),
-        Coord(0, 1),
-        Coord(1, 1))
+    Seq((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
       .collect {
-        case offset if validCoord(board, Coord(coord.x + offset.x, coord.y + offset.y)) =>
-          Coord(coord.x + offset.x, coord.y + offset.y)
+        case offset if validCoord(board, Coord(coord.x + offset._1, coord.y + offset._2)) =>
+          Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
   def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
@@ -168,7 +164,7 @@ object Application extends App {
       y += 1
     }
 
-    buffer
+    buffer.to[Seq]
   }
 
   def getBishopCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
@@ -208,24 +204,17 @@ object Application extends App {
       y += 1
       x += 1
     }
-    buffer
+    buffer.to[Seq]
   }
 
   def getQueenCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
     listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
 
   def getKnightCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq(Coord(-1, -2),
-        Coord(1, -2),
-        Coord(2, -1),
-        Coord(2, 1),
-        Coord(1, 2),
-        Coord(-1, 2),
-        Coord(-2, 1),
-        Coord(-2, -1))
+    Seq((-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1))
       .collect {
-        case offset if validCoord(board, Coord(coord.x + offset.x, coord.y + offset.y)) =>
-          Coord(coord.x + offset.x, coord.y + offset.y)
+        case offset if validCoord(board, Coord(coord.x + offset._1, coord.y + offset._2)) =>
+          Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
   def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Seq[Coord] =
