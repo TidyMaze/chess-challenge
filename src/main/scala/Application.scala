@@ -29,7 +29,7 @@ object Application extends App {
 
   case class ProblemInput(width: Int, height: Int, pieces: Map[PieceType, Int])
 
-  case class Coord(x: Int, y: Int)
+  class Coord(val x: Int, val y: Int)
 
   def put(board: Board, coord: Coord, piece: PieceType): Board = board.zipWithIndex map {
     case (line, indexLine) if indexLine == coord.y => line.updated(coord.x, Some(piece))
@@ -44,7 +44,7 @@ object Application extends App {
   def solve(problemInput: ProblemInput): Set[Board] =
     backtrack(
       mkBoard(problemInput.width, problemInput.height),
-      Some(Coord(0, 0)),
+      Some(new Coord(0, 0)),
       mapToRepeatSeq(problemInput.pieces)
     ).toSet
 
@@ -57,7 +57,7 @@ object Application extends App {
   def nextCoord(board: Board, currentCoord: Coord): Option[Coord] = {
     val inlineCoord    = currentCoord.y * board.head.size + currentCoord.x
     val nextInline     = inlineCoord + 1
-    val coordCandidate = Coord(nextInline % board.head.size, nextInline / board.head.size)
+    val coordCandidate = new Coord(nextInline % board.head.size, nextInline / board.head.size)
     Some(coordCandidate).filter(validCoord(board, _))
   }
 
@@ -95,7 +95,7 @@ object Application extends App {
   }
 
   def anyIntersects(board: Board, currentCell: Option[PieceType], x: Int, y: Int): Boolean =
-    listCoordsInRange(board, currentCell.get, Coord(x, y))
+    listCoordsInRange(board, currentCell.get, new Coord(x, y))
       .exists(coordInRange => board(coordInRange.y)(coordInRange.x).isDefined)
 
   /*
@@ -124,17 +124,17 @@ object Application extends App {
   def validCoordCurried(board: Board) = (validCoord _).curried(board)
 
   def getKingCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq(Coord(-1, -1),
-        Coord(0, -1),
-        Coord(1, -1),
-        Coord(-1, 0),
-        Coord(1, 0),
-        Coord(-1, 1),
-        Coord(0, 1),
-        Coord(1, 1))
+    Seq(new Coord(-1, -1),
+        new Coord(0, -1),
+        new Coord(1, -1),
+        new Coord(-1, 0),
+        new Coord(1, 0),
+        new Coord(-1, 1),
+        new Coord(0, 1),
+        new Coord(1, 1))
       .collect {
-        case offset if validCoord(board, Coord(coord.x + offset.x, coord.y + offset.y)) =>
-          Coord(coord.x + offset.x, coord.y + offset.y)
+        case offset if validCoord(board, new Coord(coord.x + offset.x, coord.y + offset.y)) =>
+          new Coord(coord.x + offset.x, coord.y + offset.y)
       }
 
   def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
@@ -145,25 +145,25 @@ object Application extends App {
 
     x = coord.x - 1
     while (x >= 0) {
-      buffer += Coord(x, coord.y)
+      buffer += new Coord(x, coord.y)
       x -= 1
     }
 
     x = coord.x + 1
     while (x < board.head.size) {
-      buffer += Coord(x, coord.y)
+      buffer += new Coord(x, coord.y)
       x += 1
     }
 
     y = coord.y - 1
     while (y >= 0) {
-      buffer += Coord(coord.x, y)
+      buffer += new Coord(coord.x, y)
       y -= 1
     }
 
     y = coord.y + 1
     while (y < board.size) {
-      buffer += Coord(coord.x, y)
+      buffer += new Coord(coord.x, y)
       y += 1
     }
 
@@ -179,7 +179,7 @@ object Application extends App {
     y = coord.y - 1
     x = coord.x - 1
     while (x >= 0 && y >= 0) {
-      buffer += Coord(x, y)
+      buffer += new Coord(x, y)
       y -= 1
       x -= 1
     }
@@ -187,7 +187,7 @@ object Application extends App {
     y = coord.y - 1
     x = coord.x + 1
     while (x < board.head.size && y >= 0) {
-      buffer += Coord(x, y)
+      buffer += new Coord(x, y)
       y -= 1
       x += 1
     }
@@ -195,7 +195,7 @@ object Application extends App {
     y = coord.y + 1
     x = coord.x - 1
     while (x > 0 && y < board.size) {
-      buffer += Coord(x, y)
+      buffer += new Coord(x, y)
       y += 1
       x -= 1
     }
@@ -203,7 +203,7 @@ object Application extends App {
     y = coord.y + 1
     x = coord.x + 1
     while (x < board.head.size && y < board.size) {
-      buffer += Coord(x, y)
+      buffer += new Coord(x, y)
       y += 1
       x += 1
     }
@@ -214,17 +214,10 @@ object Application extends App {
     listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
 
   def getKnightCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq(Coord(-1, -2),
-        Coord(1, -2),
-        Coord(2, -1),
-        Coord(2, 1),
-        Coord(1, 2),
-        Coord(-1, 2),
-        Coord(-2, 1),
-        Coord(-2, -1))
+    Seq((-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1))
       .collect {
-        case offset if validCoord(board, Coord(coord.x + offset.x, coord.y + offset.y)) =>
-          Coord(coord.x + offset.x, coord.y + offset.y)
+        case offset if validCoord(board, new Coord(coord.x + offset._1, coord.y + offset._2)) =>
+          new Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
   def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Seq[Coord] =
