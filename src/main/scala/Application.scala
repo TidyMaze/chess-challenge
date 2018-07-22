@@ -98,15 +98,21 @@ object Application extends App {
   Valid if no piece range intersect another piece
    */
   def valid(board: Board): Boolean = {
-    for (y <- board.indices) {
-      for (x <- board.head.indices) {
+    var y = 0
+    var x = 0
+
+    while (y < board.size) {
+      while (x < board.head.size) {
         val currentCell = board(y)(x)
         if (currentCell.isDefined) {
           for (coordInRange <- listCoordsInRange(board, currentCell.get, Coord(x, y))) {
             if (board(coordInRange.y)(coordInRange.x).isDefined) return false
           }
         }
+        x += 1
       }
+      y += 1
+      x = 0
     }
     true
   }
@@ -128,34 +134,75 @@ object Application extends App {
       .filter(validCoordCurried(board))
 
   def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
-    val left  = (coord.x - 1 to 0 by -1) map (Coord(_, coord.y))
-    val right = (coord.x + 1 until board.head.size by 1) map (Coord(_, coord.y))
-    val up    = (coord.y - 1 to 0 by -1) map (Coord(coord.x, _))
-    val down  = (coord.y + 1 until board.size by 1) map (Coord(coord.x, _))
-    left ++ right ++ up ++ down
+    val buffer = ListBuffer.empty[Coord]
+
+    var y = 0
+    var x = 0
+
+    x = coord.x - 1
+    while (x >= 0) {
+      buffer += Coord(x, coord.y)
+      x -= 1
+    }
+
+    x = coord.x + 1
+    while (x < board.head.size) {
+      buffer += Coord(x, coord.y)
+      x += 1
+    }
+
+    y = coord.y - 1
+    while (y >= 0) {
+      buffer += Coord(coord.x, y)
+      y -= 1
+    }
+
+    y = coord.y + 1
+    while (y < board.size) {
+      buffer += Coord(coord.x, y)
+      y += 1
+    }
+
+    buffer
   }
 
   def getBishopCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
     val buffer = ListBuffer.empty[Coord]
-    for {
-      y <- (coord.y - 1) to 0 by -1
-      x <- (coord.x - 1) to 0 by -1
-    } buffer += Coord(x, y)
 
-    for {
-      y <- (coord.y - 1) to 0 by -1
-      x <- (coord.x + 1) until board.head.size by 1
-    } buffer += Coord(x, y)
+    var y = 0
+    var x = 0
 
-    for {
-      y <- (coord.y + 1) until board.size by 1
-      x <- (coord.x - 1) to 0 by -1
-    } buffer += Coord(x, y)
+    y = coord.y - 1
+    x = coord.x - 1
+    while (x >= 0 && y >= 0) {
+      buffer += Coord(x, y)
+      y -= 1
+      x -= 1
+    }
 
-    for {
-      y <- (coord.y + 1) until board.size by 1
-      x <- (coord.x + 1) until board.head.size by 1
-    } buffer += Coord(x, y)
+    y = coord.y - 1
+    x = coord.x + 1
+    while (x < board.head.size && y >= 0) {
+      buffer += Coord(x, y)
+      y -= 1
+      x += 1
+    }
+
+    y = coord.y + 1
+    x = coord.x - 1
+    while (x > 0 && y < board.size) {
+      buffer += Coord(x, y)
+      y += 1
+      x -= 1
+    }
+
+    y = coord.y + 1
+    x = coord.x + 1
+    while (x < board.head.size && y < board.size) {
+      buffer += Coord(x, y)
+      y += 1
+      x += 1
+    }
     buffer
   }
 
