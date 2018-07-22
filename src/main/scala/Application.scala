@@ -82,7 +82,7 @@ object Application extends App {
       // still pieces to put but at end of board : stop here
       case (true, remaining, None) if remaining.nonEmpty => Nil
       // not finished yet. Keep searching deeper
-      case (true, _ :: _, Some(coord)) =>
+      case (true, remaining, Some(coord)) if remaining.nonEmpty =>
         remainingPieces.indices.flatMap(
           pieceIndex =>
             backtrack(
@@ -94,6 +94,10 @@ object Application extends App {
     }
   }
 
+  def anyIntersects(board: Board, currentCell: Option[PieceType], x: Int, y: Int): Boolean =
+    listCoordsInRange(board, currentCell.get, Coord(x, y))
+      .exists(coordInRange => board(coordInRange.y)(coordInRange.x).isDefined)
+
   /*
   Valid if no piece range intersect another piece
    */
@@ -104,10 +108,8 @@ object Application extends App {
     while (y < board.size) {
       while (x < board.head.size) {
         val currentCell = board(y)(x)
-        if (currentCell.isDefined) {
-          for (coordInRange <- listCoordsInRange(board, currentCell.get, Coord(x, y))) {
-            if (board(coordInRange.y)(coordInRange.x).isDefined) return false
-          }
+        if (currentCell.isDefined && anyIntersects(board, currentCell, x, y)) {
+          return false
         }
         x += 1
       }
@@ -130,8 +132,10 @@ object Application extends App {
         Coord(-1, 1),
         Coord(0, 1),
         Coord(1, 1))
-      .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
-      .filter(validCoordCurried(board))
+      .collect {
+        case offset if validCoord(board, Coord(coord.x + offset.x, coord.y + offset.y)) =>
+          Coord(coord.x + offset.x, coord.y + offset.y)
+      }
 
   def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
     val buffer = ListBuffer.empty[Coord]
@@ -218,8 +222,10 @@ object Application extends App {
         Coord(-1, 2),
         Coord(-2, 1),
         Coord(-2, -1))
-      .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
-      .filter(validCoordCurried(board))
+      .collect {
+        case offset if validCoord(board, Coord(coord.x + offset.x, coord.y + offset.y)) =>
+          Coord(coord.x + offset.x, coord.y + offset.y)
+      }
 
   def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Seq[Coord] =
     (pieceType match {
