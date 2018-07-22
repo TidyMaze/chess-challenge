@@ -1,4 +1,5 @@
 import scala.collection.mutable.ListBuffer
+import scala.collection.parallel.immutable.{ParSeq, ParSet}
 
 sealed trait PieceType
 
@@ -41,7 +42,7 @@ object Application extends App {
       case (value, times) => Seq.fill[A](times)(value)
     }.toSeq
 
-  def solve(problemInput: ProblemInput): Set[Board] =
+  def solve(problemInput: ProblemInput): ParSet[Board] =
     backtrack(
       mkBoard(problemInput.width, problemInput.height),
       Some(Coord(0, 0)),
@@ -63,7 +64,7 @@ object Application extends App {
 
   def backtrack(board: Board,
                 maybeCoord: Option[Coord],
-                remainingPieces: Seq[PieceType]): Seq[Board] = {
+                remainingPieces: Seq[PieceType]): ParSeq[Board] = {
 
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
@@ -76,14 +77,14 @@ object Application extends App {
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
-      case (false, _, _) => Nil
+      case (false, _, _) => ParSeq.empty
       // valid board and no more pieces to put : found one solution
-      case (true, Nil, _) => Seq(board)
+      case (true, Nil, _) => ParSeq(board)
       // still pieces to put but at end of board : stop here
-      case (true, remaining, None) if remaining.nonEmpty => Nil
+      case (true, remaining, None) if remaining.nonEmpty => ParSeq.empty
       // not finished yet. Keep searching deeper
       case (true, remaining, Some(coord)) if remaining.nonEmpty =>
-        remainingPieces.indices.flatMap(
+        remainingPieces.indices.par.flatMap(
           pieceIndex =>
             backtrack(
               put(board, coord, remainingPieces(pieceIndex)),
