@@ -1,3 +1,5 @@
+import scala.collection.mutable.ListBuffer
+
 sealed trait PieceType
 
 case object King extends PieceType
@@ -129,23 +131,27 @@ object Application extends App {
   }
 
   def getBishopCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
-    val upperLeft = for {
+    val buffer = ListBuffer.empty[Coord]
+    for {
       y <- (coord.y - 1) to 0 by -1
       x <- (coord.x - 1) to 0 by -1
-    } yield Coord(x, y)
-    val upperRight = for {
+    } buffer += Coord(x, y)
+
+    for {
       y <- (coord.y - 1) to 0 by -1
       x <- (coord.x + 1) until board.head.size by 1
-    } yield Coord(x, y)
-    val lowerLeft = for {
+    } buffer += Coord(x, y)
+
+    for {
       y <- (coord.y + 1) until board.size by 1
       x <- (coord.x - 1) to 0 by -1
-    } yield Coord(x, y)
-    val lowerRight = for {
+    } buffer += Coord(x, y)
+
+    for {
       y <- (coord.y + 1) until board.size by 1
       x <- (coord.x + 1) until board.head.size by 1
-    } yield Coord(x, y)
-    upperLeft ++ upperRight ++ lowerLeft ++ lowerRight
+    } buffer += Coord(x, y)
+    buffer
   }
 
   def getQueenCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
