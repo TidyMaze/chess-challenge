@@ -1,4 +1,3 @@
-import scala.collection.immutable
 sealed trait PieceType
 
 case object King extends PieceType
@@ -109,56 +108,69 @@ object Application extends App {
     coord.x >= 0 && coord.x < board.head.size && coord.y >= 0 && coord.y < board.size
   def validCoordCurried(board: Board) = (validCoord _).curried(board)
 
+  def getKingCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
+    Seq(Coord(-1, -1),
+        Coord(0, -1),
+        Coord(1, -1),
+        Coord(-1, 0),
+        Coord(1, 0),
+        Coord(-1, 1),
+        Coord(0, 1),
+        Coord(1, 1))
+      .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
+      .filter(validCoordCurried(board))
+
+  def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
+    val left  = (coord.x - 1 to 0 by -1) map (Coord(_, coord.y))
+    val right = (coord.x + 1 until board.head.size by 1) map (Coord(_, coord.y))
+    val up    = (coord.y - 1 to 0 by -1) map (Coord(coord.x, _))
+    val down  = (coord.y + 1 until board.size by 1) map (Coord(coord.x, _))
+    left ++ right ++ up ++ down
+  }
+
+  def getBishopCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
+    val upperLeft = for {
+      y <- (coord.y - 1) to 0 by -1
+      x <- (coord.x - 1) to 0 by -1
+    } yield Coord(x, y)
+    val upperRight = for {
+      y <- (coord.y - 1) to 0 by -1
+      x <- (coord.x + 1) until board.head.size by 1
+    } yield Coord(x, y)
+    val lowerLeft = for {
+      y <- (coord.y + 1) until board.size by 1
+      x <- (coord.x - 1) to 0 by -1
+    } yield Coord(x, y)
+    val lowerRight = for {
+      y <- (coord.y + 1) until board.size by 1
+      x <- (coord.x + 1) until board.head.size by 1
+    } yield Coord(x, y)
+    upperLeft ++ upperRight ++ lowerLeft ++ lowerRight
+  }
+
+  def getQueenCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
+    listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
+
+  def getKnightCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
+    Seq(Coord(-1, -2),
+        Coord(1, -2),
+        Coord(2, -1),
+        Coord(2, 1),
+        Coord(1, 2),
+        Coord(-1, 2),
+        Coord(-2, 1),
+        Coord(-2, -1))
+      .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
+      .filter(validCoordCurried(board))
+
   def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Seq[Coord] =
-    pieceType match {
-      case King =>
-        Seq(Coord(-1, -1),
-            Coord(0, -1),
-            Coord(1, -1),
-            Coord(-1, 0),
-            Coord(1, 0),
-            Coord(-1, 1),
-            Coord(0, 1),
-            Coord(1, 1))
-          .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
-          .filter(validCoordCurried(board))
-      case Rook =>
-        val left  = (coord.x - 1 to 0 by -1) map (Coord(_, coord.y))
-        val right = (coord.x + 1 until board.head.size by 1) map (Coord(_, coord.y))
-        val up    = (coord.y - 1 to 0 by -1) map (Coord(coord.x, _))
-        val down  = (coord.y + 1 until board.size by 1) map (Coord(coord.x, _))
-        left ++ right ++ up ++ down
-      case Bishop =>
-        val upperLeft = for {
-          y <- (coord.y - 1) to 0 by -1
-          x <- (coord.x - 1) to 0 by -1
-        } yield Coord(x, y)
-        val upperRight = for {
-          y <- (coord.y - 1) to 0 by -1
-          x <- (coord.x + 1) until board.head.size by 1
-        } yield Coord(x, y)
-        val lowerLeft = for {
-          y <- (coord.y + 1) until board.size by 1
-          x <- (coord.x - 1) to 0 by -1
-        } yield Coord(x, y)
-        val lowerRight = for {
-          y <- (coord.y + 1) until board.size by 1
-          x <- (coord.x + 1) until board.head.size by 1
-        } yield Coord(x, y)
-        upperLeft ++ upperRight ++ lowerLeft ++ lowerRight
-      case Queen => listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
-      case Knight =>
-        Seq(Coord(-1, -2),
-            Coord(1, -2),
-            Coord(2, -1),
-            Coord(2, 1),
-            Coord(1, 2),
-            Coord(-1, 2),
-            Coord(-2, 1),
-            Coord(-2, -1))
-          .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
-          .filter(validCoordCurried(board))
-    }
+    (pieceType match {
+      case King   => getKingCoordsInRange _
+      case Rook   => getRookCoordsInRange _
+      case Bishop => getBishopCoordsInRange _
+      case Queen  => getQueenCoordsInRange _
+      case Knight => getKnightCoordsInRange _
+    })(board, coord)
 
   val exampleProblem  = ProblemInput(3, 3, Map(King -> 2, Rook   -> 1))
   val exampleProblem2 = ProblemInput(4, 4, Map(Rook -> 2, Knight -> 4))
@@ -166,12 +178,13 @@ object Application extends App {
 
   val problems = Seq(exampleProblem, exampleProblem2, evalProblem)
 
-  problems.foreach(problem => {
-    val solutions = solve(problem)
-    println(s"Problem $problem")
-    println(s"Solutions (${solutions.size}):")
-    println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
-    println()
-  })
-
+  while (true) {
+    problems.foreach(problem => {
+      val solutions = solve(problem)
+      println(s"Problem $problem")
+      println(s"Solutions (${solutions.size}):")
+      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
+      println()
+    })
+  }
 }
