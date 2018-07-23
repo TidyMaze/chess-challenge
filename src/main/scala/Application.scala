@@ -251,7 +251,7 @@ object Application extends App {
   var totTime     = 0.0f
   var samplesSize = 0
 
-  while (true) {
+//  while (true) {
     problems.foreach(problem => {
       val (solutions, timeSpent: Float) = timeMs(solve(problem))
       totTime += timeSpent
@@ -261,5 +261,5 @@ object Application extends App {
 //      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
 //      println()
     })
-  }
+//  }
 }
