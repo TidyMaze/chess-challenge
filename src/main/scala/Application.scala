@@ -17,6 +17,8 @@ object Application extends App {
 
   type Board = IndexedSeq[IndexedSeq[Option[PieceType]]]
 
+  type TodoList = Map[PieceType, Int]
+
   def boardAsString(board: Board): String =
     board
       .map(_.map(_.map {
@@ -28,7 +30,7 @@ object Application extends App {
       } getOrElse "-").mkString(""))
       .mkString("\n")
 
-  case class ProblemInput(width: Int, height: Int, pieces: Map[PieceType, Int])
+  case class ProblemInput(width: Int, height: Int, pieces: TodoList)
 
   case class Coord(x: Int, y: Int)
 
@@ -37,18 +39,11 @@ object Application extends App {
     case (line, indexLine) if indexLine != coord.y => line
   }
 
-  def mapToRepeatSeq[A](data: Map[A, Int]): Seq[A] =
-    data
-      .flatMap {
-        case (value, times) => Seq.fill[A](times)(value)
-      }
-      .to[Seq]
-
   def solve(problemInput: ProblemInput): Int =
     backtrack(
       mkBoard(problemInput.width, problemInput.height),
       Some(Coord(0, 0)),
-      mapToRepeatSeq(problemInput.pieces)
+      problemInput.pieces
     )
 
   def mkBoard(width: Int, height: Int): Board =
@@ -64,11 +59,16 @@ object Application extends App {
     Some(coordCandidate).filter(validCoord(board, _))
   }
 
+  def removeOne(list: Application.TodoList, pieceType: PieceType): TodoList = list.collect {
+    case (`pieceType`, size: Int) if size > 1 => (pieceType, size -1)
+    case entry@(piece, _) if piece != pieceType => entry
+  }
+
   var count = 0
 
   def backtrack(board: Board,
                 maybeCoord: Option[Coord],
-                remainingPieces: Seq[PieceType]): Int = {
+                remainingPieces: TodoList): Int = {
 
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
@@ -83,22 +83,23 @@ object Application extends App {
       // invalid board : stop here
       case (false, _, _) => 0
       // valid board and no more pieces to put : found one solution
-      case (true, Nil, _) => {
+      case (true, remaining, _) if remaining.isEmpty => {
         count += 1
         if(count % 1000 == 0) println(count)
 //        println(boardAsString(board))
+//        println()
         1
       }
       // still pieces to put but at end of board : stop here
       case (true, remaining, None) if remaining.nonEmpty => 0
       // not finished yet. Keep searching deeper
       case (true, remaining, Some(coord)) if remaining.nonEmpty =>
-        remainingPieces.indices.par.map(
-          pieceIndex =>
+        remainingPieces.keys.par.map(
+          piece =>
             backtrack(
-              put(board, coord, remainingPieces(pieceIndex)),
+              put(board, coord, piece),
               maybeCoord = maybeNextCoord,
-              remainingPieces.patch(pieceIndex, Nil, 1)
+              removeOne(remainingPieces, piece)
           )).sum +
         backtrack(board, maybeNextCoord, remainingPieces)
 
