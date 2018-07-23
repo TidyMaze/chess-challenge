@@ -1,6 +1,5 @@
 import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.{Seq, IndexedSeq}
-import scala.collection.parallel.immutable.{ParSeq, ParSet}
 
 sealed trait PieceType
 
@@ -45,18 +44,18 @@ object Application extends App {
       }
       .to[Seq]
 
-  def solve(problemInput: ProblemInput): ParSet[Board] =
+  def solve(problemInput: ProblemInput): Int =
     backtrack(
       mkBoard(problemInput.width, problemInput.height),
       Some(Coord(0, 0)),
       mapToRepeatSeq(problemInput.pieces)
-    ).toSet
+    )
 
   def mkBoard(width: Int, height: Int): Board =
     Array
       .tabulate[Option[PieceType]](width, height)((_, _) => Option.empty[PieceType])
-      .map(_.to[IndexedSeq])
-      .to[IndexedSeq]
+      .map(_.toIndexedSeq)
+      .toIndexedSeq
 
   def nextCoord(board: Board, currentCoord: Coord): Option[Coord] = {
     val inlineCoord    = currentCoord.y * board.head.size + currentCoord.x
@@ -65,9 +64,11 @@ object Application extends App {
     Some(coordCandidate).filter(validCoord(board, _))
   }
 
+  var count = 0
+
   def backtrack(board: Board,
                 maybeCoord: Option[Coord],
-                remainingPieces: Seq[PieceType]): ParSeq[Board] = {
+                remainingPieces: Seq[PieceType]): Int = {
 
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
@@ -80,20 +81,26 @@ object Application extends App {
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
-      case (false, _, _) => ParSeq.empty
+      case (false, _, _) => 0
       // valid board and no more pieces to put : found one solution
-      case (true, Nil, _) => ParSeq(board)
+      case (true, Nil, _) => {
+        count += 1
+        if(count % 1000 == 0) println(count)
+//        println(boardAsString(board))
+        1
+      }
       // still pieces to put but at end of board : stop here
-      case (true, remaining, None) if remaining.nonEmpty => ParSeq.empty
+      case (true, remaining, None) if remaining.nonEmpty => 0
       // not finished yet. Keep searching deeper
       case (true, remaining, Some(coord)) if remaining.nonEmpty =>
-        remainingPieces.indices.par.flatMap(
+        remainingPieces.indices.par.map(
           pieceIndex =>
             backtrack(
               put(board, coord, remainingPieces(pieceIndex)),
               maybeCoord = maybeNextCoord,
               remainingPieces.patch(pieceIndex, Nil, 1)
-          )) ++ backtrack(board, maybeNextCoord, remainingPieces)
+          )).sum +
+        backtrack(board, maybeNextCoord, remainingPieces)
 
     }
   }
@@ -238,7 +245,7 @@ object Application extends App {
   val exampleProblem2 = ProblemInput(4, 4, Map(Rook -> 2, Knight -> 4))
   val evalProblem     = ProblemInput(7, 7, Map(King -> 2, Queen  -> 2, Bishop -> 2, Knight -> 1))
 
-  val problems = Seq(exampleProblem2)
+  val problems = Seq(evalProblem)
 
   var totTime     = 0.0f
   var samplesSize = 0
@@ -249,7 +256,7 @@ object Application extends App {
       totTime += timeSpent
       samplesSize += 1
       println(
-        s"Problem $problem : Solutions (${solutions.size}) in $timeSpent ns (avg ${totTime / samplesSize}):")
+        s"Problem $problem : Solutions (${solutions}) in $timeSpent ns (avg ${totTime / samplesSize}):")
 //      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
 //      println()
     })
