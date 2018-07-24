@@ -166,14 +166,14 @@ object Application extends App {
     coord.x >= 0 && coord.x < board.head.size && coord.y >= 0 && coord.y < board.size
   def validCoordCurried(board: Board) = (validCoord _).curried(board)
 
-  def getKingCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
+  def getKingCoordsInRange(board: Board, coord: Coord): Vector[Coord] =
+    Vector((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
       .collect {
         case offset if validCoord(board, Coord(coord.x + offset._1, coord.y + offset._2)) =>
           Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
-  def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
+  def getRookCoordsInRange(board: Board, coord: Coord): Vector[Coord] = {
     val buffer = ListBuffer.empty[Coord]
 
     var y = 0
@@ -203,10 +203,10 @@ object Application extends App {
       y += 1
     }
 
-    buffer.to[Seq]
+    buffer.to[Vector]
   }
 
-  def getBishopCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
+  def getBishopCoordsInRange(board: Board, coord: Coord): Vector[Coord] = {
     val buffer = ListBuffer.empty[Coord]
 
     var y = 0
@@ -243,20 +243,20 @@ object Application extends App {
       y += 1
       x += 1
     }
-    buffer.to[Seq]
+    buffer.to[Vector]
   }
 
-  def getQueenCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
+  def getQueenCoordsInRange(board: Board, coord: Coord): Vector[Coord] =
     listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
 
-  def getKnightCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq((-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1))
+  def getKnightCoordsInRange(board: Board, coord: Coord): Vector[Coord] =
+    Vector((-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1))
       .collect {
         case offset if validCoord(board, Coord(coord.x + offset._1, coord.y + offset._2)) =>
           Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
-  def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Seq[Coord] =
+  def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Vector[Coord] =
     (pieceType match {
       case King   => getKingCoordsInRange _
       case Rook   => getRookCoordsInRange _
