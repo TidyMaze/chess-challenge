@@ -1,7 +1,9 @@
 import scala.collection.mutable.ListBuffer
-import scala.collection.immutable.{Seq, IndexedSeq}
+import scala.collection.immutable.{IndexedSeq, Seq}
 
-sealed trait PieceType
+sealed trait CellValue
+
+sealed trait PieceType extends CellValue
 
 case object King extends PieceType
 
@@ -13,30 +15,51 @@ case object Rook extends PieceType
 
 case object Knight extends PieceType
 
+case object Blocked extends CellValue
+
+case object EmptyCell extends CellValue
+
 object Application extends App {
 
-  type Board = IndexedSeq[IndexedSeq[Option[PieceType]]]
+  type Board = IndexedSeq[IndexedSeq[CellValue]]
 
   type TodoList = Map[PieceType, Int]
 
   def boardAsString(board: Board): String =
     board
-      .map(_.map(_.map {
-        case King   => "K"
-        case Queen  => "Q"
-        case Bishop => "B"
-        case Rook   => "R"
-        case Knight => "N"
-      } getOrElse "-").mkString(""))
+      .map(_.map {
+        case King      => "K"
+        case Queen     => "Q"
+        case Bishop    => "B"
+        case Rook      => "R"
+        case Knight    => "N"
+        case EmptyCell => "-"
+        case Blocked   => "*"
+      }.mkString(""))
       .mkString("\n")
 
   case class ProblemInput(width: Int, height: Int, pieces: TodoList)
 
   case class Coord(x: Int, y: Int)
 
-  def put(board: Board, coord: Coord, piece: PieceType): Board = board.zipWithIndex map {
-    case (line, indexLine) if indexLine == coord.y => line.updated(coord.x, Some(piece))
+  def put(board: Board, coord: Coord, cell: CellValue): Board = board.zipWithIndex map {
+    case (line, indexLine) if indexLine == coord.y => line.updated(coord.x, cell)
     case (line, indexLine) if indexLine != coord.y => line
+  }
+
+  def putWithBlock(board: Board, coord: Coord, piece: PieceType): Board = {
+    val ranges = listCoordsInRange(board, piece, coord)
+
+    board.zipWithIndex map {
+      case (line, indexLine) =>
+        line.zipWithIndex map {
+          case (EmptyCell, indexColumn) if indexLine == coord.y && indexColumn == coord.x =>
+            piece
+          case (EmptyCell, indexColumn) if ranges.contains(Coord(indexColumn, indexLine)) =>
+            Blocked
+          case (cell, _) => cell
+        }
+    }
   }
 
   def solve(problemInput: ProblemInput): Int =
@@ -48,7 +71,7 @@ object Application extends App {
 
   def mkBoard(width: Int, height: Int): Board =
     Array
-      .tabulate[Option[PieceType]](width, height)((_, _) => Option.empty[PieceType])
+      .tabulate[CellValue](width, height)((_, _) => EmptyCell)
       .map(_.toIndexedSeq)
       .toIndexedSeq
 
@@ -60,24 +83,21 @@ object Application extends App {
   }
 
   def removeOne(list: Application.TodoList, pieceType: PieceType): TodoList = list.collect {
-    case (`pieceType`, size: Int) if size > 1 => (pieceType, size -1)
-    case entry@(piece, _) if piece != pieceType => entry
+    case (`pieceType`, size: Int) if size > 1     => (pieceType, size - 1)
+    case entry @ (piece, _) if piece != pieceType => entry
   }
 
   var count = 0
 
-  def backtrack(board: Board,
-                maybeCoord: Option[Coord],
-                remainingPieces: TodoList): Int = {
+  def backtrack(board: Board, maybeCoord: Option[Coord], remainingPieces: TodoList): Int = {
 
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
 
-    //    val depth: String = maybeCoord.map(c => "" + c.y * board.head.size + c.x).getOrElse("None")
-    //    println(
-    //      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
-    //        board))
-    //    if (!validBoard) println("Invalid board")
+//    val depth: String = maybeCoord.map(c => "" + (c.y * board.head.size + c.x)).getOrElse("None")
+//    println(
+//      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
+//        board))
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
@@ -85,30 +105,39 @@ object Application extends App {
       // valid board and no more pieces to put : found one solution
       case (true, remaining, _) if remaining.isEmpty => {
         count += 1
-        if(count % 1000 == 0) println(count)
+        if (count % 1000 == 0) println(count)
+//        println("SOLUTION:")
 //        println(boardAsString(board))
+//        println("remaining:" + remainingPieces)
 //        println()
         1
       }
       // still pieces to put but at end of board : stop here
       case (true, remaining, None) if remaining.nonEmpty => 0
+
+      case (true, remaining, Some(coord))
+          if remaining.nonEmpty && board(coord.y)(coord.x).isInstanceOf[Blocked.type] =>
+        backtrack(board, maybeNextCoord, remainingPieces)
+
       // not finished yet. Keep searching deeper
       case (true, remaining, Some(coord)) if remaining.nonEmpty =>
-        remainingPieces.keys.par.map(
-          piece =>
-            backtrack(
-              put(board, coord, piece),
-              maybeCoord = maybeNextCoord,
-              removeOne(remainingPieces, piece)
-          )).sum +
-        backtrack(board, maybeNextCoord, remainingPieces)
+        remainingPieces.keys.par
+          .map(
+            piece =>
+              backtrack(
+                putWithBlock(board, coord, piece),
+                maybeCoord = maybeNextCoord,
+                removeOne(remainingPieces, piece)
+            ))
+          .sum +
+          backtrack(board, maybeNextCoord, remainingPieces)
 
     }
   }
 
-  def anyIntersects(board: Board, currentCell: Option[PieceType], x: Int, y: Int): Boolean =
-    listCoordsInRange(board, currentCell.get, Coord(x, y))
-      .exists(coordInRange => board(coordInRange.y)(coordInRange.x).isDefined)
+  def anyIntersects(board: Board, currentCell: PieceType, x: Int, y: Int): Boolean =
+    listCoordsInRange(board, currentCell, Coord(x, y))
+      .exists(coordInRange => board(coordInRange.y)(coordInRange.x).isInstanceOf[PieceType])
 
   /*
   Valid if no piece range intersect another piece
@@ -120,8 +149,10 @@ object Application extends App {
     while (y < board.size) {
       while (x < board.head.size) {
         val currentCell = board(y)(x)
-        if (currentCell.isDefined && anyIntersects(board, currentCell, x, y)) {
-          return false
+        currentCell match {
+          case pieceType: PieceType if anyIntersects(board, pieceType, x, y) =>
+            return false
+          case _ =>
         }
         x += 1
       }
@@ -252,14 +283,14 @@ object Application extends App {
   var samplesSize = 0
 
 //  while (true) {
-    problems.foreach(problem => {
-      val (solutions, timeSpent: Float) = timeMs(solve(problem))
-      totTime += timeSpent
-      samplesSize += 1
-      println(
-        s"Problem $problem : Solutions (${solutions}) in $timeSpent ns (avg ${totTime / samplesSize}):")
+  problems.foreach(problem => {
+    val (solutions, timeSpent: Float) = timeMs(solve(problem))
+    totTime += timeSpent
+    samplesSize += 1
+    println(
+      s"Problem $problem : Solutions (${solutions}) in $timeSpent ns (avg ${totTime / samplesSize}):")
 //      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
 //      println()
-    })
+  })
 //  }
 }
