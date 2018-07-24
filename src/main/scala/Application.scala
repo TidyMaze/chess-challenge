@@ -1,4 +1,5 @@
 import scala.collection.mutable.ListBuffer
+import scala.collection.immutable.{Seq, IndexedSeq}
 
 sealed trait PieceType
 
@@ -16,6 +17,8 @@ object Application extends App {
 
   type Board = IndexedSeq[IndexedSeq[Option[PieceType]]]
 
+  type TodoList = Map[PieceType, Int]
+
   def boardAsString(board: Board): String =
     board
       .map(_.map(_.map {
@@ -27,7 +30,7 @@ object Application extends App {
       } getOrElse "-").mkString(""))
       .mkString("\n")
 
-  case class ProblemInput(width: Int, height: Int, pieces: Map[PieceType, Int])
+  case class ProblemInput(width: Int, height: Int, pieces: TodoList)
 
   case class Coord(x: Int, y: Int)
 
@@ -36,17 +39,12 @@ object Application extends App {
     case (line, indexLine) if indexLine != coord.y => line
   }
 
-  def mapToRepeatSeq[A](data: Map[A, Int]): Seq[A] =
-    data.flatMap {
-      case (value, times) => Seq.fill[A](times)(value)
-    }.toSeq
-
-  def solve(problemInput: ProblemInput): Set[Board] =
+  def solve(problemInput: ProblemInput): Int =
     backtrack(
       mkBoard(problemInput.width, problemInput.height),
       Some(Coord(0, 0)),
-      mapToRepeatSeq(problemInput.pieces)
-    ).toSet
+      problemInput.pieces
+    )
 
   def mkBoard(width: Int, height: Int): Board =
     Array
@@ -61,9 +59,16 @@ object Application extends App {
     Some(coordCandidate).filter(validCoord(board, _))
   }
 
+  def removeOne(list: Application.TodoList, pieceType: PieceType): TodoList = list.collect {
+    case (`pieceType`, size: Int) if size > 1 => (pieceType, size -1)
+    case entry@(piece, _) if piece != pieceType => entry
+  }
+
+  var count = 0
+
   def backtrack(board: Board,
                 maybeCoord: Option[Coord],
-                remainingPieces: Seq[PieceType]): Seq[Board] = {
+                remainingPieces: TodoList): Int = {
 
     val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
@@ -76,37 +81,52 @@ object Application extends App {
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
-      case (false, _, _) => Nil
+      case (false, _, _) => 0
       // valid board and no more pieces to put : found one solution
-      case (true, Nil, _) => Seq(board)
+      case (true, remaining, _) if remaining.isEmpty => {
+        count += 1
+        if(count % 1000 == 0) println(count)
+//        println(boardAsString(board))
+//        println()
+        1
+      }
       // still pieces to put but at end of board : stop here
-      case (true, remaining, None) if remaining.nonEmpty => Nil
+      case (true, remaining, None) if remaining.nonEmpty => 0
       // not finished yet. Keep searching deeper
-      case (true, _ :: _, Some(coord)) =>
-        remainingPieces.indices.flatMap(
-          pieceIndex =>
+      case (true, remaining, Some(coord)) if remaining.nonEmpty =>
+        remainingPieces.keys.par.map(
+          piece =>
             backtrack(
-              put(board, coord, remainingPieces(pieceIndex)),
+              put(board, coord, piece),
               maybeCoord = maybeNextCoord,
-              remainingPieces.patch(pieceIndex, Nil, 1)
-          )) ++ backtrack(board, maybeNextCoord, remainingPieces)
+              removeOne(remainingPieces, piece)
+          )).sum +
+        backtrack(board, maybeNextCoord, remainingPieces)
 
     }
   }
+
+  def anyIntersects(board: Board, currentCell: Option[PieceType], x: Int, y: Int): Boolean =
+    listCoordsInRange(board, currentCell.get, Coord(x, y))
+      .exists(coordInRange => board(coordInRange.y)(coordInRange.x).isDefined)
 
   /*
   Valid if no piece range intersect another piece
    */
   def valid(board: Board): Boolean = {
-    for (y <- board.indices) {
-      for (x <- board.head.indices) {
+    var y = 0
+    var x = 0
+
+    while (y < board.size) {
+      while (x < board.head.size) {
         val currentCell = board(y)(x)
-        if (currentCell.isDefined) {
-          for (coordInRange <- listCoordsInRange(board, currentCell.get, Coord(x, y))) {
-            if (board(coordInRange.y)(coordInRange.x).isDefined) return false
-          }
+        if (currentCell.isDefined && anyIntersects(board, currentCell, x, y)) {
+          return false
         }
+        x += 1
       }
+      y += 1
+      x = 0
     }
     true
   }
@@ -116,63 +136,94 @@ object Application extends App {
   def validCoordCurried(board: Board) = (validCoord _).curried(board)
 
   def getKingCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq(Coord(-1, -1),
-        Coord(0, -1),
-        Coord(1, -1),
-        Coord(-1, 0),
-        Coord(1, 0),
-        Coord(-1, 1),
-        Coord(0, 1),
-        Coord(1, 1))
-      .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
-      .filter(validCoordCurried(board))
+    Seq((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
+      .collect {
+        case offset if validCoord(board, Coord(coord.x + offset._1, coord.y + offset._2)) =>
+          Coord(coord.x + offset._1, coord.y + offset._2)
+      }
 
   def getRookCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
-    val left  = (coord.x - 1 to 0 by -1) map (Coord(_, coord.y))
-    val right = (coord.x + 1 until board.head.size by 1) map (Coord(_, coord.y))
-    val up    = (coord.y - 1 to 0 by -1) map (Coord(coord.x, _))
-    val down  = (coord.y + 1 until board.size by 1) map (Coord(coord.x, _))
-    left ++ right ++ up ++ down
+    val buffer = ListBuffer.empty[Coord]
+
+    var y = 0
+    var x = 0
+
+    x = coord.x - 1
+    while (x >= 0) {
+      buffer += Coord(x, coord.y)
+      x -= 1
+    }
+
+    x = coord.x + 1
+    while (x < board.head.size) {
+      buffer += Coord(x, coord.y)
+      x += 1
+    }
+
+    y = coord.y - 1
+    while (y >= 0) {
+      buffer += Coord(coord.x, y)
+      y -= 1
+    }
+
+    y = coord.y + 1
+    while (y < board.size) {
+      buffer += Coord(coord.x, y)
+      y += 1
+    }
+
+    buffer.to[Seq]
   }
 
   def getBishopCoordsInRange(board: Board, coord: Coord): Seq[Coord] = {
     val buffer = ListBuffer.empty[Coord]
-    for {
-      y <- (coord.y - 1) to 0 by -1
-      x <- (coord.x - 1) to 0 by -1
-    } buffer += Coord(x, y)
 
-    for {
-      y <- (coord.y - 1) to 0 by -1
-      x <- (coord.x + 1) until board.head.size by 1
-    } buffer += Coord(x, y)
+    var y = 0
+    var x = 0
 
-    for {
-      y <- (coord.y + 1) until board.size by 1
-      x <- (coord.x - 1) to 0 by -1
-    } buffer += Coord(x, y)
+    y = coord.y - 1
+    x = coord.x - 1
+    while (x >= 0 && y >= 0) {
+      buffer += Coord(x, y)
+      y -= 1
+      x -= 1
+    }
 
-    for {
-      y <- (coord.y + 1) until board.size by 1
-      x <- (coord.x + 1) until board.head.size by 1
-    } buffer += Coord(x, y)
-    buffer
+    y = coord.y - 1
+    x = coord.x + 1
+    while (x < board.head.size && y >= 0) {
+      buffer += Coord(x, y)
+      y -= 1
+      x += 1
+    }
+
+    y = coord.y + 1
+    x = coord.x - 1
+    while (x > 0 && y < board.size) {
+      buffer += Coord(x, y)
+      y += 1
+      x -= 1
+    }
+
+    y = coord.y + 1
+    x = coord.x + 1
+    while (x < board.head.size && y < board.size) {
+      buffer += Coord(x, y)
+      y += 1
+      x += 1
+    }
+    buffer.to[Seq]
   }
 
   def getQueenCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
     listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
 
   def getKnightCoordsInRange(board: Board, coord: Coord): Seq[Coord] =
-    Seq(Coord(-1, -2),
-        Coord(1, -2),
-        Coord(2, -1),
-        Coord(2, 1),
-        Coord(1, 2),
-        Coord(-1, 2),
-        Coord(-2, 1),
-        Coord(-2, -1))
-      .map(offset => Coord(coord.x + offset.x, coord.y + offset.y))
-      .filter(validCoordCurried(board))
+    Seq((-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1))
+      .collect {
+        case offset if validCoord(board, Coord(coord.x + offset._1, coord.y + offset._2)) =>
+          Coord(coord.x + offset._1, coord.y + offset._2)
+      }
 
   def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Seq[Coord] =
     (pieceType match {
@@ -183,19 +234,32 @@ object Application extends App {
       case Knight => getKnightCoordsInRange _
     })(board, coord)
 
+  def timeMs[R](block: => R): (R, Float) = {
+    val t0     = System.nanoTime()
+    val result = block // call-by-name
+    val t1     = System.nanoTime()
+    val delta  = (t1 - t0).toFloat / 1000000.toFloat
+    (result, delta)
+  }
+
   val exampleProblem  = ProblemInput(3, 3, Map(King -> 2, Rook   -> 1))
   val exampleProblem2 = ProblemInput(4, 4, Map(Rook -> 2, Knight -> 4))
   val evalProblem     = ProblemInput(7, 7, Map(King -> 2, Queen  -> 2, Bishop -> 2, Knight -> 1))
 
-  val problems = Seq(exampleProblem, exampleProblem2, evalProblem)
+  val problems = Seq(evalProblem)
 
-  while (true) {
+  var totTime     = 0.0f
+  var samplesSize = 0
+
+//  while (true) {
     problems.foreach(problem => {
-      val solutions = solve(problem)
-      println(s"Problem $problem")
-      println(s"Solutions (${solutions.size}):")
-      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
-      println()
+      val (solutions, timeSpent: Float) = timeMs(solve(problem))
+      totTime += timeSpent
+      samplesSize += 1
+      println(
+        s"Problem $problem : Solutions (${solutions}) in $timeSpent ns (avg ${totTime / samplesSize}):")
+//      println(solutions map ("\n" + boardAsString(_)) mkString ("\n"))
+//      println()
     })
-  }
+//  }
 }

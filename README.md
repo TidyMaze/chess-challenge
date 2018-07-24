@@ -65,6 +65,4 @@ R---
 --R-
 -N-N
 
-Problem ProblemInput(7,7,Map(King -> 2, Queen -> 2, Bishop -> 2, Knight -> 1))
-Solutions (0):
 ```
