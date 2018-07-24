@@ -1,5 +1,6 @@
+import scala.collection.AbstractSeq
 import scala.collection.mutable.ListBuffer
-import scala.collection.immutable.{IndexedSeq, Seq}
+import scala.collection.immutable.{IndexedSeq, ListMap, Seq}
 
 sealed trait CellValue
 
@@ -23,7 +24,7 @@ object Application extends App {
 
   type Board = IndexedSeq[IndexedSeq[CellValue]]
 
-  type TodoList = Map[PieceType, Int]
+  type TodoList = ListMap[PieceType, Int]
 
   def boardAsString(board: Board): String =
     board
@@ -91,13 +92,18 @@ object Application extends App {
 
   def backtrack(board: Board, maybeCoord: Option[Coord], remainingPieces: TodoList): Int = {
 
-    val validBoard     = valid(board)
     val maybeNextCoord = maybeCoord.flatMap(c => nextCoord(board, c))
 
 //    val depth: String = maybeCoord.map(c => "" + (c.y * board.head.size + c.x)).getOrElse("None")
 //    println(
 //      s"backtracking at $maybeCoord (depth $depth) with pieces $remainingPieces board:\n" + boardAsString(
 //        board))
+
+    if (maybeCoord.exists(c => board(c.y)(c.x).isInstanceOf[Blocked.type])) {
+      return backtrack(board, maybeNextCoord, remainingPieces)
+    }
+
+    val validBoard = valid(board)
 
     (validBoard, remainingPieces, maybeCoord) match {
       // invalid board : stop here
@@ -173,7 +179,7 @@ object Application extends App {
           Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
-  def getRookCoordsInRange(board: Board, coord: Coord): Vector[Coord] = {
+  def getRookCoordsInRange(board: Board, coord: Coord): ListBuffer[Coord] = {
     val buffer = ListBuffer.empty[Coord]
 
     var y = 0
@@ -203,10 +209,10 @@ object Application extends App {
       y += 1
     }
 
-    buffer.to[Vector]
+    buffer
   }
 
-  def getBishopCoordsInRange(board: Board, coord: Coord): Vector[Coord] = {
+  def getBishopCoordsInRange(board: Board, coord: Coord): ListBuffer[Coord] = {
     val buffer = ListBuffer.empty[Coord]
 
     var y = 0
@@ -243,11 +249,11 @@ object Application extends App {
       y += 1
       x += 1
     }
-    buffer.to[Vector]
+    buffer
   }
 
-  def getQueenCoordsInRange(board: Board, coord: Coord): Vector[Coord] =
-    listCoordsInRange(board, Rook, coord) ++ listCoordsInRange(board, Bishop, coord)
+  def getQueenCoordsInRange(board: Board, coord: Coord): ListBuffer[Coord] =
+    getRookCoordsInRange(board, coord) ++ getBishopCoordsInRange(board, coord)
 
   def getKnightCoordsInRange(board: Board, coord: Coord): Vector[Coord] =
     Vector((-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1))
@@ -256,7 +262,7 @@ object Application extends App {
           Coord(coord.x + offset._1, coord.y + offset._2)
       }
 
-  def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): Vector[Coord] =
+  def listCoordsInRange(board: Board, pieceType: PieceType, coord: Coord): AbstractSeq[Coord] =
     (pieceType match {
       case King   => getKingCoordsInRange _
       case Rook   => getRookCoordsInRange _
@@ -273,9 +279,9 @@ object Application extends App {
     (result, delta)
   }
 
-  val exampleProblem  = ProblemInput(3, 3, Map(King -> 2, Rook   -> 1))
-  val exampleProblem2 = ProblemInput(4, 4, Map(Rook -> 2, Knight -> 4))
-  val evalProblem     = ProblemInput(7, 7, Map(King -> 2, Queen  -> 2, Bishop -> 2, Knight -> 1))
+  val exampleProblem  = ProblemInput(3, 3, ListMap(Rook   -> 1, King   -> 2))
+  val exampleProblem2 = ProblemInput(4, 4, ListMap(Rook   -> 2, Knight -> 4))
+  val evalProblem     = ProblemInput(7, 7, ListMap(Knight -> 1, King   -> 2, Bishop -> 2, Queen -> 2))
 
   val problems = Seq(evalProblem)
 
